@@ -20,15 +20,25 @@ It uses GRUB as its bootloader and QEMU to run the operating system in a virtual
 
 ```text
 MiniOS/
+│
+├── boot/
+│
 ├── kernel/
 │   ├── boot.s
-│   └── kernel.c
+│   ├── kernel.c
+│   │
+│   └── include/
+│       └── kernel.h
+│
 ├── iso/
 │   └── boot/
+│       ├── kernel.elf
 │       └── grub/
 │           └── grub.cfg
+│
 ├── linker.ld
-└── README.md
+├── README.md
+└── .gitignore
 ```
 
 ## 4. How MiniOS Boots
