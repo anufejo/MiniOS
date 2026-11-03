@@ -1,5 +1,7 @@
 #include "shell.h"
-#include <limits.h>
+
+#define INT_MAX 2147483647
+#define INT_MIN (-2147483647 - 1)
 
 /* Calculate the length of a string. */
 static unsigned int string_length(const char *str)
@@ -48,13 +50,14 @@ static void copy_text(char *output,
 }
 
 /* Read a signed integer from the command. */
+/* Read a signed integer from the command. */
 static int parse_integer(const char *input,
                          unsigned int *position,
                          unsigned int end,
                          int *value)
 {
-    unsigned long long number = 0;
-    unsigned long long limit;
+    unsigned int number = 0;
+    unsigned int limit;
     unsigned int digits = 0;
     int sign = 1;
 
@@ -72,9 +75,7 @@ static int parse_integer(const char *input,
         (*position)++;
     }
 
-    limit = (sign == 1)
-        ? (unsigned long long)INT_MAX
-        : (unsigned long long)(-(long long)INT_MIN);
+    limit = (sign == 1) ? (unsigned int)INT_MAX : 2147483648U;
 
     while (*position < end &&
            input[*position] >= '0' &&
@@ -82,10 +83,10 @@ static int parse_integer(const char *input,
     {
         unsigned int digit = input[*position] - '0';
 
-        if (number > (limit - digit) / 10)
+        if (number > (limit - digit) / 10U)
             return 0;
 
-        number = number * 10 + digit;
+        number = number * 10U + digit;
         digits++;
         (*position)++;
     }
@@ -94,33 +95,39 @@ static int parse_integer(const char *input,
         return 0;
 
     if (sign == -1)
-        *value = (int)(-(long long)number);
+    {
+        if (number == 2147483648U)
+            *value = INT_MIN;
+        else
+            *value = -(int)number;
+    }
     else
+    {
         *value = (int)number;
+    }
 
     return 1;
 }
-
 /* Convert an integer into text. */
 static void integer_to_text(int number, char *text)
 {
     char temp[32];
     unsigned int i = 0;
     unsigned int j = 0;
-    unsigned long long value;
+    unsigned int value;
 
     if (number < 0)
-        value = (unsigned long long)(-(long long)number);
+        value = 0U - (unsigned int)number;
     else
-        value = (unsigned long long)number;
+        value = (unsigned int)number;
 
     if (number < 0)
         text[j++] = '-';
 
     do
     {
-        temp[i++] = (char)('0' + value % 10);
-        value /= 10;
+        temp[i++] = (char)('0' + value % 10U);
+        value /= 10U;
     }
     while (value > 0);
 

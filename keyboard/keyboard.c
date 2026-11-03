@@ -1,11 +1,8 @@
-
 #include "keyboard.h"
 
-/* PS/2 keyboard controller ports */
 #define KEYBOARD_DATA_PORT   0x60
 #define KEYBOARD_STATUS_PORT 0x64
 
-/* Read a byte from an x86 hardware port */
 static inline unsigned char inb(unsigned short port)
 {
     unsigned char result;
@@ -19,8 +16,7 @@ static inline unsigned char inb(unsigned short port)
     return result;
 }
 
-/* Basic US keyboard scan-code map (Set 1) */
-static const char keyboard_map[128] = {
+static const char normal_map[128] = {
     0,  27, '1', '2', '3', '4', '5', '6',
     '7', '8', '9', '0', '-', '=', '\b', '\t',
     'q', 'w', 'e', 'r', 't', 'y', 'u', 'i',
@@ -31,9 +27,22 @@ static const char keyboard_map[128] = {
     0, ' '
 };
 
+static const char shifted_map[128] = {
+    0,  27, '!', '@', '#', '$', '%', '^',
+    '&', '*', '(', ')', '_', '+', '\b', '\t',
+    'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I',
+    'O', 'P', '{', '}', '\n', 0, 'A', 'S',
+    'D', 'F', 'G', 'H', 'J', 'K', 'L', ':',
+    '"', '~', 0, '|', 'Z', 'X', 'C', 'V',
+    'B', 'N', 'M', '<', '>', '?', 0, '*',
+    0, ' '
+};
+
+static int shift_pressed = 0;
+
 void keyboard_init(void)
 {
-    /* Polling driver: no interrupt setup needed yet. */
+    shift_pressed = 0;
 }
 
 char keyboard_getchar(void)
@@ -42,20 +51,41 @@ char keyboard_getchar(void)
 
     while (1)
     {
-        /* Wait until the controller has data */
         if (inb(KEYBOARD_STATUS_PORT) & 1)
         {
             scan_code = inb(KEYBOARD_DATA_PORT);
 
-            /* Ignore key-release scan codes */
-            
+            /* Left or right Shift pressed. */
+            if (scan_code == 0x2A || scan_code == 0x36)
+            {
+                shift_pressed = 1;
+                continue;
+            }
 
-            /* Ignore unmapped scan codes */
+            /* Left or right Shift released. */
+            if (scan_code == 0xAA || scan_code == 0xB6)
+            {
+                shift_pressed = 0;
+                continue;
+            }
+
+            /* Ignore all other key-release codes. */
+            if (scan_code & 0x80)
+                continue;
+
             if (scan_code >= 128)
                 continue;
 
-            if (keyboard_map[scan_code] != 0)
-                return keyboard_map[scan_code];
+            if (shift_pressed)
+            {
+                if (shifted_map[scan_code] != 0)
+                    return shifted_map[scan_code];
+            }
+            else
+            {
+                if (normal_map[scan_code] != 0)
+                    return normal_map[scan_code];
+            }
         }
     }
 }
