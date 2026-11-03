@@ -1,5 +1,5 @@
-
 #include "shell.h"
+#include <limits.h>
 
 /* Calculate the length of a string. */
 static unsigned int string_length(const char *str)
@@ -47,6 +47,201 @@ static void copy_text(char *output,
     output[i] = '\0';
 }
 
+/* Read a signed integer from the command. */
+static int parse_integer(const char *input,
+                         unsigned int *position,
+                         unsigned int end,
+                         int *value)
+{
+    unsigned long long number = 0;
+    unsigned long long limit;
+    unsigned int digits = 0;
+    int sign = 1;
+
+    while (*position < end &&
+           (input[*position] == ' ' || input[*position] == '\t'))
+        (*position)++;
+
+    if (*position < end && input[*position] == '-')
+    {
+        sign = -1;
+        (*position)++;
+    }
+    else if (*position < end && input[*position] == '+')
+    {
+        (*position)++;
+    }
+
+    limit = (sign == 1)
+        ? (unsigned long long)INT_MAX
+        : (unsigned long long)(-(long long)INT_MIN);
+
+    while (*position < end &&
+           input[*position] >= '0' &&
+           input[*position] <= '9')
+    {
+        unsigned int digit = input[*position] - '0';
+
+        if (number > (limit - digit) / 10)
+            return 0;
+
+        number = number * 10 + digit;
+        digits++;
+        (*position)++;
+    }
+
+    if (digits == 0)
+        return 0;
+
+    if (sign == -1)
+        *value = (int)(-(long long)number);
+    else
+        *value = (int)number;
+
+    return 1;
+}
+
+/* Convert an integer into text. */
+static void integer_to_text(int number, char *text)
+{
+    char temp[32];
+    unsigned int i = 0;
+    unsigned int j = 0;
+    unsigned long long value;
+
+    if (number < 0)
+        value = (unsigned long long)(-(long long)number);
+    else
+        value = (unsigned long long)number;
+
+    if (number < 0)
+        text[j++] = '-';
+
+    do
+    {
+        temp[i++] = (char)('0' + value % 10);
+        value /= 10;
+    }
+    while (value > 0);
+
+    while (i > 0)
+        text[j++] = temp[--i];
+
+    text[j] = '\0';
+}
+
+/* Calculator command: calc 5 + 3 */
+static void calculate(const char *input,
+                      unsigned int start,
+                      unsigned int end,
+                      char *output,
+                      unsigned int output_size)
+{
+    unsigned int position = start;
+    int first;
+    int second;
+    int result;
+    char operation;
+    char number_text[32];
+    long long answer;
+
+    if (!parse_integer(input, &position, end, &first))
+    {
+        copy_text(output, output_size,
+                  "Usage: calc <number> <operator> <number>");
+        return;
+    }
+
+    while (position < end &&
+           (input[position] == ' ' || input[position] == '\t'))
+        position++;
+
+    if (position >= end)
+    {
+        copy_text(output, output_size, "Missing operator.");
+        return;
+    }
+
+    operation = input[position++];
+
+    if (!parse_integer(input, &position, end, &second))
+    {
+        copy_text(output, output_size,
+                  "Usage: calc <number> <operator> <number>");
+        return;
+    }
+
+    while (position < end &&
+           (input[position] == ' ' || input[position] == '\t'))
+        position++;
+
+    if (position != end)
+    {
+        copy_text(output, output_size, "Invalid calculator input.");
+        return;
+    }
+
+    switch (operation)
+    {
+        case '+':
+            answer = (long long)first + second;
+            break;
+
+        case '-':
+            answer = (long long)first - second;
+            break;
+
+        case '*':
+            answer = (long long)first * second;
+            break;
+
+        case '/':
+            if (second == 0)
+            {
+                copy_text(output, output_size,
+                          "Error: Division by zero.");
+                return;
+            }
+
+            if (first == INT_MIN && second == -1)
+            {
+                copy_text(output, output_size,
+                          "Error: Result is too large.");
+                return;
+            }
+
+            answer = first / second;
+            break;
+
+        default:
+            copy_text(output, output_size,
+                      "Invalid operator. Use +, -, * or /.");
+            return;
+    }
+
+    if (answer > INT_MAX || answer < INT_MIN)
+    {
+        copy_text(output, output_size,
+                  "Error: Result is too large.");
+        return;
+    }
+
+    result = (int)answer;
+    integer_to_text(result, number_text);
+
+    copy_text(output, output_size, "Result: ");
+
+    {
+        unsigned int i = string_length(output);
+        unsigned int j = 0;
+
+        while (number_text[j] != '\0' && i < output_size - 1)
+            output[i++] = number_text[j++];
+
+        output[i] = '\0';
+    }
+}
+
 /* Process a command entered by the user. */
 ShellResult shell_execute(const char *input,
                           char *output,
@@ -73,9 +268,9 @@ ShellResult shell_execute(const char *input,
     while (input[start] == ' ' || input[start] == '\t')
         start++;
 
-    /* Remove trailing newline characters. */
     end = string_length(input);
 
+    /* Remove trailing newline characters. */
     while (end > start &&
            (input[end - 1] == '\n' || input[end - 1] == '\r'))
         end--;
@@ -85,7 +280,6 @@ ShellResult shell_execute(const char *input,
            (input[end - 1] == ' ' || input[end - 1] == '\t'))
         end--;
 
-    /* Empty command. */
     if (start == end)
         return SHELL_OK;
 
@@ -124,6 +318,8 @@ ShellResult shell_execute(const char *input,
             "about   - Information about MiniOS\n"
             "version - Show OS version\n"
             "echo    - Display a message\n"
+            "calc    - Perform basic calculations\n"
+            "whoami  - Show current OS user\n"
             "clear   - Clear the terminal");
     }
 
@@ -164,6 +360,18 @@ ShellResult shell_execute(const char *input,
         }
     }
 
+    /* CALCULATOR command. */
+    else if (string_compare(command, "calc"))
+    {
+        calculate(input, start, end, output, output_size);
+    }
+
+    /* WHOAMI command. */
+    else if (string_compare(command, "whoami"))
+    {
+        copy_text(output, output_size, "MiniOS user");
+    }
+
     /* CLEAR command. */
     else if (string_compare(command, "clear"))
     {
@@ -179,4 +387,3 @@ ShellResult shell_execute(const char *input,
 
     return SHELL_OK;
 }
-
