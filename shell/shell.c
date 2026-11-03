@@ -130,6 +130,27 @@ static void integer_to_text(int number, char *text)
     text[j] = '\0';
 }
 
+/* Display a message followed by an integer. */
+static void number_message(char *output,
+                           unsigned int output_size,
+                           const char *message,
+                           int number)
+{
+    char number_text[32];
+    unsigned int i;
+    unsigned int j = 0;
+
+    integer_to_text(number, number_text);
+    copy_text(output, output_size, message);
+
+    i = string_length(output);
+
+    while (number_text[j] != '\0' && i < output_size - 1)
+        output[i++] = number_text[j++];
+
+    output[i] = '\0';
+}
+
 /* Calculator command: calc 5 + 3 */
 static void calculate(const char *input,
                       unsigned int start,
@@ -320,7 +341,15 @@ ShellResult shell_execute(const char *input,
             "echo    - Display a message\n"
             "calc    - Perform basic calculations\n"
             "whoami  - Show current OS user\n"
-            "clear   - Clear the terminal");
+            "clear   - Clear the terminal"
+            "\nrepeat  - Repeat a message"
+		"\ncount   - Count message characters"
+		"\nreverse - Reverse a message"
+		"\nupper   - Convert text to uppercase"
+		"\nlower   - Convert text to lowercase"
+		"\nsquare  - Calculate the square of a number"
+		"\neven    - Check whether a number is even"
+		"\nodd     - Check whether a number is odd");
     }
 
     /* ABOUT command. */
@@ -370,6 +399,159 @@ ShellResult shell_execute(const char *input,
     else if (string_compare(command, "whoami"))
     {
         copy_text(output, output_size, "MiniOS user");
+    }
+    
+        /* REPEAT command. */
+    else if (string_compare(command, "repeat"))
+    {
+        if (start == end)
+            copy_text(output, output_size, "Usage: repeat <message>");
+        else
+        {
+            for (i = 0; i < end - start && i < output_size - 1; i++)
+                output[i] = input[start + i];
+
+            output[i] = '\0';
+        }
+    }
+
+    /* COUNT command. */
+    else if (string_compare(command, "count"))
+    {
+        if (start == end)
+        {
+            copy_text(output, output_size, "Usage: count <message>");
+        }
+        else
+        {
+            number_message(output, output_size,
+                           "Characters: ", (int)(end - start));
+        }
+    }
+
+    /* REVERSE command. */
+    else if (string_compare(command, "reverse"))
+    {
+        if (start == end)
+        {
+            copy_text(output, output_size, "Usage: reverse <message>");
+        }
+        else
+        {
+            unsigned int length = end - start;
+
+            if (length >= output_size)
+                length = output_size - 1;
+
+            for (i = 0; i < length; i++)
+                output[i] = input[end - 1 - i];
+
+            output[length] = '\0';
+        }
+    }
+
+    /* UPPER command. */
+    else if (string_compare(command, "upper"))
+    {
+        if (start == end)
+        {
+            copy_text(output, output_size, "Usage: upper <message>");
+        }
+        else
+        {
+            unsigned int length = end - start;
+
+            if (length >= output_size)
+                length = output_size - 1;
+
+            for (i = 0; i < length; i++)
+            {
+                char ch = input[start + i];
+
+                if (ch >= 'a' && ch <= 'z')
+                    ch = ch - 'a' + 'A';
+
+                output[i] = ch;
+            }
+
+            output[length] = '\0';
+        }
+    }
+
+    /* LOWER command. */
+    else if (string_compare(command, "lower"))
+    {
+        if (start == end)
+        {
+            copy_text(output, output_size, "Usage: lower <message>");
+        }
+        else
+        {
+            unsigned int length = end - start;
+
+            if (length >= output_size)
+                length = output_size - 1;
+
+            for (i = 0; i < length; i++)
+            {
+                char ch = input[start + i];
+
+                if (ch >= 'A' && ch <= 'Z')
+                    ch = ch - 'A' + 'a';
+
+                output[i] = ch;
+            }
+
+            output[length] = '\0';
+        }
+    }
+
+    /* SQUARE, EVEN AND ODD commands. */
+    else if (string_compare(command, "square") ||
+             string_compare(command, "even") ||
+             string_compare(command, "odd"))
+    {
+        unsigned int position = start;
+        int number;
+
+        if (!parse_integer(input, &position, end, &number))
+        {
+            copy_text(output, output_size,
+                      "Usage: enter a valid integer.");
+        }
+        else
+        {
+            while (position < end &&
+                   (input[position] == ' ' || input[position] == '\t'))
+                position++;
+
+            if (position != end)
+            {
+                copy_text(output, output_size, "Invalid number.");
+            }
+            else if (string_compare(command, "square"))
+            {
+                long long result = (long long)number * number;
+
+                if (result > INT_MAX)
+                    copy_text(output, output_size, "Result is too large.");
+                else
+                    number_message(output, output_size,
+                                   "Square: ", (int)result);
+            }
+            else if (string_compare(command, "even"))
+            {
+                copy_text(output, output_size,
+                    number % 2 == 0 ? "The number is even."
+                                    : "The number is not even.");
+            }
+            else
+            {
+                copy_text(output, output_size,
+                    number % 2 != 0 ? "The number is odd."
+                                    : "The number is not odd.");
+            }
+        }
     }
 
     /* CLEAR command. */
