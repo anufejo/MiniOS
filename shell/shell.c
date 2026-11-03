@@ -1,13 +1,13 @@
+
 #include "shell.h"
+
 /* Calculate the length of a string. */
 static unsigned int string_length(const char *str)
 {
     unsigned int length = 0;
 
     while (str[length] != '\0')
-    {
         length++;
-    }
 
     return length;
 }
@@ -28,17 +28,15 @@ static int string_compare(const char *a, const char *b)
     return a[i] == '\0' && b[i] == '\0';
 }
 
-/* Copy text into an output buffer safely. */
+/* Safely copy text into an output buffer. */
 static void copy_text(char *output,
                       unsigned int output_size,
                       const char *text)
 {
     unsigned int i = 0;
 
-    if (output_size == 0)
-    {
+    if (output == 0 || output_size == 0)
         return;
-    }
 
     while (text[i] != '\0' && i < output_size - 1)
     {
@@ -55,15 +53,13 @@ ShellResult shell_execute(const char *input,
                           unsigned int output_size)
 {
     unsigned int start = 0;
-    unsigned int end = 0;
+    unsigned int end;
     unsigned int command_length = 0;
-    char command[32];
     unsigned int i;
+    char command[32];
 
-    if (output_size == 0)
-    {
+    if (output == 0 || output_size == 0)
         return SHELL_OK;
-    }
 
     output[0] = '\0';
 
@@ -73,28 +69,27 @@ ShellResult shell_execute(const char *input,
         return SHELL_OK;
     }
 
-    /* Ignore spaces at the beginning. */
+    /* Ignore leading spaces and tabs. */
     while (input[start] == ' ' || input[start] == '\t')
-    {
         start++;
-    }
 
-    /* Ignore spaces at the end. */
+    /* Remove trailing newline characters. */
     end = string_length(input);
-    while (end > 0 && (input[end - 1] == '\n' || input[end - 1] == '\r'))
-    end--;
+
+    while (end > start &&
+           (input[end - 1] == '\n' || input[end - 1] == '\r'))
+        end--;
+
+    /* Ignore trailing spaces and tabs. */
     while (end > start &&
            (input[end - 1] == ' ' || input[end - 1] == '\t'))
-    {
         end--;
-    }
 
+    /* Empty command. */
     if (start == end)
-    {
         return SHELL_OK;
-    }
 
-    /* Extract the command name. */
+    /* Extract command name. */
     while (start + command_length < end &&
            input[start + command_length] != ' ' &&
            input[start + command_length] != '\t')
@@ -109,21 +104,18 @@ ShellResult shell_execute(const char *input,
     }
 
     for (i = 0; i < command_length; i++)
-    {
         command[i] = input[start + i];
-    }
 
     command[command_length] = '\0';
-    /* Find the beginning of the command argument. */
+
+    /* Find command argument. */
     start += command_length;
 
     while (start < end &&
            (input[start] == ' ' || input[start] == '\t'))
-    {
         start++;
-    }
 
-    /* HELP command */
+    /* HELP command. */
     if (string_compare(command, "help"))
     {
         copy_text(output, output_size,
@@ -135,7 +127,7 @@ ShellResult shell_execute(const char *input,
             "clear   - Clear the terminal");
     }
 
-    /* ABOUT command */
+    /* ABOUT command. */
     else if (string_compare(command, "about"))
     {
         copy_text(output, output_size,
@@ -144,14 +136,13 @@ ShellResult shell_execute(const char *input,
             "Built using C and Assembly.");
     }
 
-    /* VERSION command */
+    /* VERSION command. */
     else if (string_compare(command, "version"))
     {
-        copy_text(output, output_size,
-            "MiniOS version 1.0");
+        copy_text(output, output_size, "MiniOS version 1.0");
     }
 
-    /* ECHO command */
+    /* ECHO command. */
     else if (string_compare(command, "echo"))
     {
         if (start == end)
@@ -164,26 +155,22 @@ ShellResult shell_execute(const char *input,
             unsigned int copy_length = length;
 
             if (copy_length >= output_size)
-            {
                 copy_length = output_size - 1;
-            }
 
             for (i = 0; i < copy_length; i++)
-            {
                 output[i] = input[start + i];
-            }
 
             output[copy_length] = '\0';
         }
     }
 
-    /* CLEAR command */
+    /* CLEAR command. */
     else if (string_compare(command, "clear"))
     {
         return SHELL_CLEAR;
     }
 
-    /* Unknown command */
+    /* Unknown command. */
     else
     {
         copy_text(output, output_size,
@@ -192,3 +179,4 @@ ShellResult shell_execute(const char *input,
 
     return SHELL_OK;
 }
+
